@@ -2,16 +2,16 @@
 
 Save the script:
 ```
-bashcurl -o ~/.pvm.sh https://[save-the-artifact-content]
+curl -o ~/.pvm.sh https://[save-the-artifact-content]
 # Or manually save the artifact to ~/.pvm.sh
 ```
 Add to your shell profile (~/.bashrc or ~/.zshrc):
 ```
-bashsource ~/.pvm.sh
+source ~/.pvm.sh
 ```
 Reload your shell:
 ```
-bashsource ~/.bashrc  # or source ~/.zshrc
+source ~/.bashrc  # or source ~/.zshrc
 ```
 Key Features
 
@@ -26,16 +26,16 @@ Prerequisites
 Before installing PHP versions, you'll need build dependencies:
 Ubuntu/Debian:
 ```
-bashsudo apt-get install build-essential libxml2-dev libssl-dev \
+sudo apt-get install build-essential libxml2-dev libssl-dev \
   libcurl4-openssl-dev libzip-dev pkg-config
 ```
 macOS:
 ```
-bashbrew install openssl curl zlib pkg-config
+brew install openssl curl zlib pkg-config
 ```
 Example Workflow
 ```
-bashpvm install 8.3.0      # Install PHP 8.3.0
+pvm install 8.3.0      # Install PHP 8.3.0
 pvm use 8.3.0          # Switch to it
 php -v                 # Verify
 
