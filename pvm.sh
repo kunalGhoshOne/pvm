@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
 # PHP Version Manager (pvm)
-# Similar to nvm but for PHP with automatic dependency installation
+# Similar to nvm but for PHP with pre-compiled binary installation
 
 PVM_DIR="${PVM_DIR:-$HOME/.pvm}"
 PVM_VERSIONS_DIR="$PVM_DIR/versions"
 PVM_ALIAS_DIR="$PVM_DIR/alias"
 PVM_CURRENT_FILE="$PVM_DIR/current"
-PVM_DEPS_INSTALLED_FILE="$PVM_DIR/.deps_installed"
 
 # Colors for output
 RED='\033[0;31m'
@@ -59,17 +58,20 @@ pvm_detect_os() {
     fi
 }
 
-# Check if running with sudo/root
-pvm_has_sudo() {
-    if [ "$EUID" -eq 0 ]; then
-        return 0
-    fi
-    
-    if sudo -n true 2>/dev/null; then
-        return 0
-    fi
-    
-    return 1
+# Detect architecture
+pvm_detect_arch() {
+    local arch=$(uname -m)
+    case "$arch" in
+        x86_64|amd64)
+            echo "x86_64"
+            ;;
+        aarch64|arm64)
+            echo "arm64"
+            ;;
+        *)
+            echo "$arch"
+            ;;
+    esac
 }
 
 # Check if a command exists
@@ -77,287 +79,8 @@ pvm_command_exists() {
     command -v "$1" &> /dev/null
 }
 
-# Check which dependencies are missing
-pvm_check_dependencies() {
-    local missing_deps=()
-    local os=$(pvm_detect_os)
-    
-    pvm_info "Checking for existing dependencies..."
-    
-    # Common tools
-    local common_tools=("curl" "wget" "git" "tar" "gzip" "unzip" "make")
-    local common_missing=()
-    
-    for tool in "${common_tools[@]}"; do
-        if ! pvm_command_exists "$tool"; then
-            common_missing+=("$tool")
-        else
-            pvm_info "✓ $tool is already installed"
-        fi
-    done
-    
-    # Build tools
-    local build_tools=("gcc" "g++" "autoconf")
-    local build_missing=()
-    
-    for tool in "${build_tools[@]}"; do
-        if ! pvm_command_exists "$tool"; then
-            build_missing+=("$tool")
-        else
-            pvm_info "✓ $tool is already installed"
-        fi
-    done
-    
-    # Check for pkg-config
-    if ! pvm_command_exists "pkg-config"; then
-        missing_deps+=("pkg-config")
-    else
-        pvm_info "✓ pkg-config is already installed"
-    fi
-    
-    # Return status
-    if [ ${#common_missing[@]} -eq 0 ] && [ ${#build_missing[@]} -eq 0 ]; then
-        pvm_echo "All essential tools are already installed!"
-        
-        # Check if we've verified libraries before
-        if [ -f "$PVM_DEPS_INSTALLED_FILE" ]; then
-            pvm_info "Build libraries were verified before."
-            return 0
-        else
-            pvm_info "Will verify development libraries..."
-            return 2  # Need to check libraries
-        fi
-    else
-        if [ ${#common_missing[@]} -gt 0 ]; then
-            pvm_warn "Missing common tools: ${common_missing[*]}"
-        fi
-        if [ ${#build_missing[@]} -gt 0 ]; then
-            pvm_warn "Missing build tools: ${build_missing[*]}"
-        fi
-        return 1  # Need to install
-    fi
-}
-
-# Install dependencies based on OS
-pvm_install_dependencies() {
-    # Check current state
-    local check_result
-    pvm_check_dependencies
-    check_result=$?
-    
-    if [ $check_result -eq 0 ]; then
-        pvm_info "All dependencies verified. Skipping installation."
-        return 0
-    fi
-    
-    if [ -f "$PVM_DEPS_INSTALLED_FILE" ] && [ $check_result -ne 1 ]; then
-        pvm_info "Dependencies already verified. Run 'pvm reinstall-deps' to reinstall."
-        return 0
-    fi
-    
-    local os=$(pvm_detect_os)
-    
-    pvm_echo "Detected OS: $os"
-    
-    if [ $check_result -eq 1 ]; then
-        pvm_echo "Installing missing dependencies..."
-    else
-        pvm_echo "Verifying and installing development libraries..."
-    fi
-    
-    case "$os" in
-        ubuntu|debian|pop|linuxmint)
-            pvm_info "Installing dependencies for Debian/Ubuntu..."
-            
-            if ! pvm_has_sudo; then
-                pvm_warn "This requires sudo privileges. You may be prompted for your password."
-            fi
-            
-            # Only update if we're actually installing something
-            if [ $check_result -eq 1 ]; then
-                pvm_info "Updating package lists..."
-                sudo apt-get update -qq
-            fi
-            
-            pvm_info "Installing required packages (this may take a moment)..."
-            sudo apt-get install -y -qq \
-                build-essential \
-                autoconf \
-                libtool \
-                bison \
-                re2c \
-                libxml2-dev \
-                libssl-dev \
-                libcurl4-openssl-dev \
-                libzip-dev \
-                libpng-dev \
-                libjpeg-dev \
-                libfreetype6-dev \
-                libonig-dev \
-                libsqlite3-dev \
-                libpq-dev \
-                pkg-config \
-                curl \
-                wget \
-                git \
-                unzip
-            
-            if [ $? -eq 0 ]; then
-                pvm_echo "✓ All dependencies installed successfully!"
-                touch "$PVM_DEPS_INSTALLED_FILE"
-            else
-                pvm_error "Failed to install some dependencies"
-                return 1
-            fi
-            ;;
-            
-        fedora|rhel|centos|rocky|almalinux)
-            pvm_info "Installing dependencies for RHEL/Fedora/CentOS..."
-            
-            if ! pvm_has_sudo; then
-                pvm_warn "This requires sudo privileges. You may be prompted for your password."
-            fi
-            
-            pvm_info "Installing required packages (this may take a moment)..."
-            sudo dnf install -y -q \
-                gcc \
-                gcc-c++ \
-                make \
-                autoconf \
-                libtool \
-                bison \
-                re2c \
-                libxml2-devel \
-                openssl-devel \
-                libcurl-devel \
-                libzip-devel \
-                libpng-devel \
-                libjpeg-devel \
-                freetype-devel \
-                oniguruma-devel \
-                sqlite-devel \
-                postgresql-devel \
-                pkgconfig \
-                curl \
-                wget \
-                git \
-                unzip
-            
-            if [ $? -eq 0 ]; then
-                pvm_echo "✓ All dependencies installed successfully!"
-                touch "$PVM_DEPS_INSTALLED_FILE"
-            else
-                pvm_error "Failed to install some dependencies"
-                return 1
-            fi
-            ;;
-            
-        arch|manjaro)
-            pvm_info "Installing dependencies for Arch Linux..."
-            
-            if ! pvm_has_sudo; then
-                pvm_warn "This requires sudo privileges. You may be prompted for your password."
-            fi
-            
-            pvm_info "Installing required packages (this may take a moment)..."
-            sudo pacman -Sy --noconfirm --needed \
-                base-devel \
-                autoconf \
-                libtool \
-                bison \
-                re2c \
-                libxml2 \
-                openssl \
-                curl \
-                libzip \
-                libpng \
-                libjpeg-turbo \
-                freetype2 \
-                oniguruma \
-                sqlite \
-                postgresql-libs \
-                pkgconf \
-                wget \
-                git \
-                unzip
-            
-            if [ $? -eq 0 ]; then
-                pvm_echo "✓ All dependencies installed successfully!"
-                touch "$PVM_DEPS_INSTALLED_FILE"
-            else
-                pvm_error "Failed to install some dependencies"
-                return 1
-            fi
-            ;;
-            
-        macos)
-            pvm_info "Installing dependencies for macOS..."
-            
-            # Check if Homebrew is installed
-            if ! pvm_command_exists brew; then
-                pvm_echo "Homebrew not found. Installing Homebrew..."
-                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-                
-                if [ $? -ne 0 ]; then
-                    pvm_error "Failed to install Homebrew"
-                    return 1
-                fi
-                pvm_echo "✓ Homebrew installed successfully!"
-            else
-                pvm_info "✓ Homebrew is already installed"
-            fi
-            
-            pvm_info "Installing required packages (this may take a moment)..."
-            brew install -q \
-                autoconf \
-                automake \
-                libtool \
-                bison \
-                re2c \
-                libxml2 \
-                openssl@3 \
-                curl \
-                libzip \
-                libpng \
-                jpeg \
-                freetype \
-                oniguruma \
-                sqlite \
-                postgresql \
-                pkg-config \
-                wget
-            
-            if [ $? -eq 0 ]; then
-                pvm_echo "✓ All dependencies installed successfully!"
-                
-                # Set environment variables for macOS
-                export PKG_CONFIG_PATH="/usr/local/opt/openssl@3/lib/pkgconfig:/usr/local/opt/libxml2/lib/pkgconfig:$PKG_CONFIG_PATH"
-                
-                pvm_info "Note: Added PKG_CONFIG_PATH for OpenSSL and libxml2"
-                pvm_info "Consider adding this to your shell profile for persistence"
-                
-                touch "$PVM_DEPS_INSTALLED_FILE"
-            else
-                pvm_error "Failed to install some dependencies"
-                return 1
-            fi
-            ;;
-            
-        *)
-            pvm_error "Unsupported operating system: $os"
-            pvm_info "Please install build dependencies manually:"
-            pvm_info "  - build-essential / gcc / make"
-            pvm_info "  - autoconf, libtool, bison, re2c"
-            pvm_info "  - libxml2, openssl, curl, libzip"
-            pvm_info "  - libpng, libjpeg, freetype, oniguruma"
-            pvm_info "  - sqlite, postgresql (optional)"
-            return 1
-            ;;
-    esac
-}
-
 pvm_list_remote() {
-    pvm_echo "Fetching available PHP versions from php.net..."
+    pvm_echo "Fetching available PHP versions..."
     
     if ! command -v jq &> /dev/null; then
         pvm_warn "jq not found, showing raw data..."
@@ -393,6 +116,7 @@ pvm_list() {
     done
 }
 
+# Install PHP using system package manager
 pvm_install() {
     local version=$1
     
@@ -400,16 +124,6 @@ pvm_install() {
         pvm_error "Please specify a version to install"
         echo "Usage: pvm install <version>"
         return 1
-    fi
-    
-    # Check and install dependencies first
-    if [ ! -f "$PVM_DEPS_INSTALLED_FILE" ]; then
-        pvm_echo "Installing build dependencies first..."
-        pvm_install_dependencies
-        if [ $? -ne 0 ]; then
-            pvm_error "Failed to install dependencies. Cannot proceed with PHP installation."
-            return 1
-        fi
     fi
     
     # Remove 'v' prefix if present
@@ -422,82 +136,203 @@ pvm_install() {
         return 0
     fi
     
-    pvm_echo "Installing PHP $version..."
-    
-    local temp_dir=$(mktemp -d)
-    cd "$temp_dir" || return 1
-    
-    # Download PHP source
-    pvm_echo "Downloading PHP $version source..."
-    local download_url="https://www.php.net/distributions/php-${version}.tar.gz"
-    
-    if ! curl -fL "$download_url" -o "php-${version}.tar.gz"; then
-        pvm_error "Failed to download PHP $version"
-        pvm_info "Make sure the version exists. Try 'pvm list-remote' to see available versions"
-        rm -rf "$temp_dir"
-        return 1
-    fi
-    
-    # Extract
-    pvm_echo "Extracting..."
-    tar -xzf "php-${version}.tar.gz"
-    cd "php-${version}" || return 1
-    
-    # Detect OS for configure options
     local os=$(pvm_detect_os)
-    local configure_opts="--prefix=$install_dir"
+    local arch=$(pvm_detect_arch)
     
-    if [ "$os" = "macos" ]; then
-        # macOS specific paths
-        configure_opts="$configure_opts \
-            --with-openssl=$(brew --prefix openssl@3) \
-            --with-curl=$(brew --prefix curl) \
-            --with-zlib=$(brew --prefix zlib)"
+    pvm_echo "Installing PHP $version for $os ($arch)..."
+    
+    mkdir -p "$install_dir"
+    
+    case "$os" in
+        ubuntu|debian|pop|linuxmint)
+            pvm_install_deb "$version" "$install_dir"
+            ;;
+        fedora|rhel|centos|rocky|almalinux)
+            pvm_install_rpm "$version" "$install_dir"
+            ;;
+        arch|manjaro)
+            pvm_install_arch "$version" "$install_dir"
+            ;;
+        macos)
+            pvm_install_macos "$version" "$install_dir"
+            ;;
+        *)
+            pvm_error "Unsupported operating system: $os"
+            pvm_info "Supported: Ubuntu/Debian, Fedora/RHEL, Arch, macOS"
+            return 1
+            ;;
+    esac
+}
+
+# Install on Debian/Ubuntu using ondrej/php PPA
+pvm_install_deb() {
+    local version=$1
+    local install_dir=$2
+    
+    pvm_info "Installing via system packages (using ondrej/php repository)..."
+    
+    # Add ondrej/php repository if not present
+    if ! grep -q "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null; then
+        pvm_info "Adding ondrej/php repository..."
+        sudo apt-get update -qq
+        sudo apt-get install -y software-properties-common
+        sudo add-apt-repository -y ppa:ondrej/php
+        sudo apt-get update -qq
     fi
     
-    # Configure with common options
-    pvm_echo "Configuring PHP $version..."
-    ./configure \
-        $configure_opts \
-        --enable-mbstring \
-        --enable-zip \
-        --with-curl \
-        --with-openssl \
-        --with-zlib \
-        --enable-fpm \
-        --enable-bcmath \
-        --with-pdo-mysql \
-        --with-jpeg \
-        --with-freetype \
-        --enable-gd \
-        --disable-cgi 2>&1 | tee configure.log | grep -E "(error|warning|checking)" | tail -20
+    # Extract major.minor version (e.g., 8.3.0 -> 8.3)
+    local short_version=$(echo "$version" | cut -d. -f1-2)
     
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-        pvm_error "Configuration failed."
-        pvm_info "Check $temp_dir/php-${version}/configure.log for details"
-        pvm_info "Dependencies might be missing. Run 'pvm reinstall-deps' to reinstall them"
+    pvm_info "Installing PHP $short_version packages..."
+    
+    # Install PHP and common extensions
+    sudo apt-get install -y \
+        php${short_version}-cli \
+        php${short_version}-common \
+        php${short_version}-fpm \
+        php${short_version}-mysql \
+        php${short_version}-zip \
+        php${short_version}-gd \
+        php${short_version}-mbstring \
+        php${short_version}-curl \
+        php${short_version}-xml \
+        php${short_version}-bcmath \
+        php${short_version}-sqlite3 \
+        php${short_version}-pgsql
+    
+    if [ $? -ne 0 ]; then
+        pvm_error "Failed to install PHP $short_version"
         return 1
     fi
     
-    # Compile
-    pvm_echo "Compiling PHP $version (this may take 5-15 minutes)..."
-    local num_cores=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+    # Create symlinks in install directory
+    mkdir -p "$install_dir/bin"
+    ln -sf /usr/bin/php${short_version} "$install_dir/bin/php"
+    ln -sf /usr/bin/php-config${short_version} "$install_dir/bin/php-config" 2>/dev/null
+    ln -sf /usr/bin/phpize${short_version} "$install_dir/bin/phpize" 2>/dev/null
     
-    if ! make -j"$num_cores"; then
-        pvm_error "Compilation failed"
-        pvm_info "Check the output above for errors"
+    pvm_echo "✓ Successfully installed PHP $version!"
+    pvm_echo "Run 'pvm use $version' to activate it"
+}
+
+# Install on Fedora/RHEL using Remi repository
+pvm_install_rpm() {
+    local version=$1
+    local install_dir=$2
+    
+    pvm_info "Installing via system packages (using Remi repository)..."
+    
+    # Add Remi repository if not present
+    if ! rpm -qa | grep -q remi-release; then
+        pvm_info "Adding Remi repository..."
+        local os_version=$(rpm -E %{rhel})
+        sudo dnf install -y https://rpms.remirepo.net/enterprise/remi-release-${os_version}.rpm
+        sudo dnf install -y dnf-plugins-core
+    fi
+    
+    local short_version=$(echo "$version" | cut -d. -f1-2 | tr -d '.')
+    
+    pvm_info "Enabling PHP $short_version module..."
+    sudo dnf module reset php -y
+    sudo dnf module enable php:remi-${short_version} -y
+    
+    pvm_info "Installing PHP packages..."
+    sudo dnf install -y \
+        php \
+        php-cli \
+        php-fpm \
+        php-mysqlnd \
+        php-zip \
+        php-gd \
+        php-mbstring \
+        php-xml \
+        php-bcmath \
+        php-pgsql
+    
+    if [ $? -ne 0 ]; then
+        pvm_error "Failed to install PHP"
         return 1
     fi
     
-    # Install
-    pvm_echo "Installing to $install_dir..."
-    make install
+    mkdir -p "$install_dir/bin"
+    ln -sf /usr/bin/php "$install_dir/bin/php"
+    ln -sf /usr/bin/php-config "$install_dir/bin/php-config" 2>/dev/null
     
-    # Cleanup
-    cd "$HOME" || return 1
-    rm -rf "$temp_dir"
+    pvm_echo "✓ Successfully installed PHP $version!"
+    pvm_echo "Run 'pvm use $version' to activate it"
+}
+
+# Install on Arch Linux
+pvm_install_arch() {
+    local version=$1
+    local install_dir=$2
     
-    pvm_echo "Successfully installed PHP $version! 🎉"
+    pvm_info "Installing via pacman..."
+    
+    local short_version=$(echo "$version" | cut -d. -f1-2 | tr -d '.')
+    
+    # Arch usually has php package for current version
+    pvm_info "Installing PHP packages..."
+    sudo pacman -S --noconfirm --needed \
+        php \
+        php-fpm \
+        php-gd \
+        php-sqlite \
+        php-pgsql
+    
+    if [ $? -ne 0 ]; then
+        pvm_error "Failed to install PHP"
+        return 1
+    fi
+    
+    mkdir -p "$install_dir/bin"
+    ln -sf /usr/bin/php "$install_dir/bin/php"
+    ln -sf /usr/bin/php-config "$install_dir/bin/php-config" 2>/dev/null
+    
+    pvm_echo "✓ Successfully installed PHP $version!"
+    pvm_echo "Run 'pvm use $version' to activate it"
+}
+
+# Install on macOS using Homebrew
+pvm_install_macos() {
+    local version=$1
+    local install_dir=$2
+    
+    pvm_info "Installing via Homebrew..."
+    
+    # Check if Homebrew is installed
+    if ! pvm_command_exists brew; then
+        pvm_error "Homebrew is not installed"
+        pvm_info "Install Homebrew from https://brew.sh"
+        return 1
+    fi
+    
+    local short_version=$(echo "$version" | cut -d. -f1-2)
+    local formula="php@${short_version}"
+    
+    # Add shivammathur/php tap for older versions
+    if ! brew tap | grep -q shivammathur/php; then
+        pvm_info "Adding shivammathur/php tap..."
+        brew tap shivammathur/php
+    fi
+    
+    pvm_info "Installing $formula..."
+    brew install "$formula"
+    
+    if [ $? -ne 0 ]; then
+        pvm_error "Failed to install $formula"
+        return 1
+    fi
+    
+    # Find PHP installation path
+    local brew_prefix=$(brew --prefix "$formula")
+    
+    mkdir -p "$install_dir/bin"
+    ln -sf "$brew_prefix/bin/php" "$install_dir/bin/php"
+    ln -sf "$brew_prefix/bin/php-config" "$install_dir/bin/php-config" 2>/dev/null
+    ln -sf "$brew_prefix/bin/phpize" "$install_dir/bin/phpize" 2>/dev/null
+    
+    pvm_echo "✓ Successfully installed PHP $version!"
     pvm_echo "Run 'pvm use $version' to activate it"
 }
 
@@ -616,7 +451,8 @@ pvm_uninstall() {
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         rm -rf "$version_dir"
-        pvm_echo "Uninstalled PHP $version"
+        pvm_echo "Uninstalled PHP $version (symlinks only)"
+        pvm_info "Note: System packages are not removed. Use your package manager to remove them."
     fi
 }
 
@@ -645,7 +481,7 @@ pvm_exec() {
     version=${version#v}
     local php_bin="$PVM_VERSIONS_DIR/$version/bin/php"
     
-    if [ ! -f "$php_bin" ]; then
+    if [ ! -f "$php_bin" ] && [ ! -L "$php_bin" ]; then
         pvm_error "PHP $version is not installed"
         return 1
     fi
@@ -653,18 +489,12 @@ pvm_exec() {
     "$php_bin" "$@"
 }
 
-pvm_reinstall_deps() {
-    rm -f "$PVM_DEPS_INSTALLED_FILE"
-    pvm_echo "Reinstalling dependencies..."
-    pvm_install_dependencies
-}
-
 pvm_help() {
     cat << EOF
-${GREEN}PHP Version Manager (pvm)${NC}
+${GREEN}PHP Version Manager (pvm)${NC} - Binary Installation
 
 ${BLUE}Usage:${NC}
-  pvm install <version>     Install a specific PHP version (auto-installs dependencies)
+  pvm install <version>     Install PHP using system packages (no compilation!)
   pvm use <version>         Use a specific PHP version
   pvm list                  List installed PHP versions
   pvm list-remote           List available PHP versions
@@ -673,11 +503,10 @@ ${BLUE}Usage:${NC}
   pvm alias [name] [ver]    Create/list version aliases
   pvm which [version]       Show path to PHP binary
   pvm exec <ver> <cmd>      Execute command with specific version
-  pvm reinstall-deps        Reinstall build dependencies
   pvm help                  Show this help message
 
 ${BLUE}Examples:${NC}
-  pvm install 8.3.0         # Installs dependencies automatically first time
+  pvm install 8.3.0         # Fast installation using pre-built packages
   pvm use 8.3.0
   pvm alias default 8.3.0
   pvm exec 8.2.0 script.php
@@ -686,7 +515,13 @@ ${BLUE}Auto-switching:${NC}
 Create a .phpversion file in your project with version number.
 pvm will automatically switch when you cd into the directory.
 
+${BLUE}Installation Method:${NC}
+- Uses system package managers (apt, dnf, pacman, brew)
+- No compilation required - fast and lightweight
+- Common extensions included automatically
+
 ${BLUE}Detected OS:${NC} $(pvm_detect_os)
+${BLUE}Architecture:${NC} $(pvm_detect_arch)
 ${BLUE}PVM Directory:${NC} $PVM_DIR
 EOF
 }
@@ -725,9 +560,6 @@ pvm() {
             ;;
         exec)
             pvm_exec "$@"
-            ;;
-        reinstall-deps)
-            pvm_reinstall_deps
             ;;
         help|--help|-h)
             pvm_help
@@ -768,4 +600,4 @@ fi
 
 pvm_echo "PHP Version Manager loaded! 🚀"
 pvm_echo "Run 'pvm help' to get started"
-pvm_info "Detected OS: $(pvm_detect_os)"
+pvm_info "Detected OS: $(pvm_detect_os) ($(pvm_detect_arch))"
