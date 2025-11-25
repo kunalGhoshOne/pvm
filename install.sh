@@ -165,9 +165,15 @@ download_pvm() {
         run_as_root chmod +x "$PVM_SCRIPT_PATH"
         echo_success "PVM script installed to $PVM_SCRIPT_PATH"
     else
-        echo_error "pvm.sh not found. Please ensure pvm.sh is in the current directory"
-        echo_info "Or update PVM_SCRIPT_URL in this script to download from GitHub"
-        return 1
+        # echo_error "pvm.sh not found. Please ensure pvm.sh is in the current directory"
+        # echo_info "Or update PVM_SCRIPT_URL in this script to download from GitHub"
+        # return 1
+
+        curl -o ./pvm.sh -L "$PVM_SCRIPT_URL"
+        echo_info "Using pvm.sh from current directory"
+        run_as_root cp ./pvm.sh "$PVM_SCRIPT_PATH"
+        run_as_root chmod +x "$PVM_SCRIPT_PATH"
+        echo_success "PVM script installed to $PVM_SCRIPT_PATH"
     fi
 }
 
