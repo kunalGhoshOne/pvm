@@ -7,7 +7,7 @@ Simple and powerful PHP version manager for Linux and macOS. Install, switch, an
 ### Step 1: Download PVM
 
 ```bash
-curl -o https://raw.githubusercontent.com/kunalGhoshOne/pvm/development/install.sh && chmod +x install.sh && ./install.sh
+curl -o install.sh https://raw.githubusercontent.com/kunalGhoshOne/pvm/development/install.sh && chmod +x install.sh && ./install.sh
 ```
 
 ### Step 2: Add to Shell Profile
