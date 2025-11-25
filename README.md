@@ -9,13 +9,8 @@ Simple and powerful PHP version manager for Linux and macOS. Install, switch, an
 ```bash
 curl -o install.sh https://raw.githubusercontent.com/kunalGhoshOne/pvm/development/install.sh && chmod +x install.sh && ./install.sh
 ```
-
-### Step 2: Add to Shell Profile
-
-**For Bash:**
-```bash
-echo 'source ~/.pvm.sh' >> ~/.bashrc
-source ~/.bashrc
+curl -o ~/.pvm.sh https://[save-the-artifact-content]
+# Or manually save the artifact to ~/.pvm.sh
 ```
 
 **For Zsh:**
@@ -23,11 +18,7 @@ source ~/.bashrc
 echo 'source ~/.pvm.sh' >> ~/.zshrc
 source ~/.zshrc
 ```
-
-### Step 3: Verify Installation
-
-```bash
-pvm help
+source ~/.pvm.sh
 ```
 
 That's it! PVM will automatically install dependencies when needed.
@@ -41,13 +32,7 @@ That's it! PVM will automatically install dependencies when needed.
 ```bash
 pvm install 8.3.0
 ```
-
-*First time: PVM will automatically detect your OS and install all required build dependencies.*
-
-### Switch PHP Version
-
-```bash
-pvm use 8.3.0
+source ~/.bashrc  # or source ~/.zshrc
 ```
 
 ### List Installed Versions
@@ -55,11 +40,8 @@ pvm use 8.3.0
 ```bash
 pvm list
 ```
-
-### List Available Versions
-
-```bash
-pvm list-remote
+sudo apt-get install build-essential libxml2-dev libssl-dev \
+  libcurl4-openssl-dev libzip-dev pkg-config
 ```
 
 ### Show Current Version
@@ -67,18 +49,7 @@ pvm list-remote
 ```bash
 pvm current
 ```
-
-### Uninstall a Version
-
-```bash
-pvm uninstall 8.2.0
-```
-
-### Create Version Alias
-
-```bash
-pvm alias default 8.3.0
-pvm use default
+brew install openssl curl zlib pkg-config
 ```
 
 ### Execute with Specific Version
@@ -86,6 +57,9 @@ pvm use default
 ```bash
 pvm exec 8.2.0 script.php
 ```
+pvm install 8.3.0      # Install PHP 8.3.0
+pvm use 8.3.0          # Switch to it
+php -v                 # Verify
 
 ---
 
