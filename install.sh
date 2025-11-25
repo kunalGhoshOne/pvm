@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 PVM_DIR="${PVM_DIR:-$HOME/.pvm}"
-PVM_SCRIPT_URL="https://raw.githubusercontent.com/yourusername/pvm/main/pvm.sh"
+PVM_SCRIPT_URL="https://raw.githubusercontent.com/kunalGhoshOne/pvm/development/pvm.sh"
 PVM_SCRIPT_PATH="/usr/bin/pvm"
 
 echo_info() {
