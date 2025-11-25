@@ -74,6 +74,20 @@ pvm_detect_arch() {
     esac
 }
 
+# Check if running with sudo/root
+pvm_is_root() {
+    [ "$EUID" -eq 0 ]
+}
+
+# Execute command with sudo only if not root
+pvm_sudo() {
+    if pvm_is_root; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
 # Check if a command exists
 pvm_command_exists() {
     command -v "$1" &> /dev/null
@@ -174,10 +188,10 @@ pvm_install_deb() {
     # Add ondrej/php repository if not present
     if ! grep -q "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null; then
         pvm_info "Adding ondrej/php repository..."
-        sudo apt-get update -qq
-        sudo apt-get install -y software-properties-common
-        sudo add-apt-repository -y ppa:ondrej/php
-        sudo apt-get update -qq
+        pvm_sudo apt-get update -qq
+        pvm_sudo apt-get install -y software-properties-common
+        pvm_sudo add-apt-repository -y ppa:ondrej/php
+        pvm_sudo apt-get update -qq
     fi
     
     # Extract major.minor version (e.g., 8.3.0 -> 8.3)
@@ -186,7 +200,7 @@ pvm_install_deb() {
     pvm_info "Installing PHP $short_version packages..."
     
     # Install PHP and common extensions
-    sudo apt-get install -y \
+    pvm_sudo apt-get install -y \
         php${short_version}-cli \
         php${short_version}-common \
         php${short_version}-fpm \
@@ -226,18 +240,18 @@ pvm_install_rpm() {
     if ! rpm -qa | grep -q remi-release; then
         pvm_info "Adding Remi repository..."
         local os_version=$(rpm -E %{rhel})
-        sudo dnf install -y https://rpms.remirepo.net/enterprise/remi-release-${os_version}.rpm
-        sudo dnf install -y dnf-plugins-core
+        pvm_sudo dnf install -y https://rpms.remirepo.net/enterprise/remi-release-${os_version}.rpm
+        pvm_sudo dnf install -y dnf-plugins-core
     fi
     
     local short_version=$(echo "$version" | cut -d. -f1-2 | tr -d '.')
     
     pvm_info "Enabling PHP $short_version module..."
-    sudo dnf module reset php -y
-    sudo dnf module enable php:remi-${short_version} -y
+    pvm_sudo dnf module reset php -y
+    pvm_sudo dnf module enable php:remi-${short_version} -y
     
     pvm_info "Installing PHP packages..."
-    sudo dnf install -y \
+    pvm_sudo dnf install -y \
         php \
         php-cli \
         php-fpm \
@@ -273,7 +287,7 @@ pvm_install_arch() {
     
     # Arch usually has php package for current version
     pvm_info "Installing PHP packages..."
-    sudo pacman -S --noconfirm --needed \
+    pvm_sudo pacman -S --noconfirm --needed \
         php \
         php-fpm \
         php-gd \
@@ -601,3 +615,7 @@ fi
 pvm_echo "PHP Version Manager loaded! 🚀"
 pvm_echo "Run 'pvm help' to get started"
 pvm_info "Detected OS: $(pvm_detect_os) ($(pvm_detect_arch))"
+pvm_info "Installation method: Pre-built system packages (no compilation)"
+if pvm_is_root; then
+    pvm_info "Running as root - sudo not required"
+fi
