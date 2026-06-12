@@ -7,10 +7,6 @@ on:
         description: 'PHP minor version to build (e.g. 8.3) or "all"'
         required: true
         default: 'all'
-  push:
-    paths:
-      - 'server/scripts/versions.sh'
-      - 'server/dockerfiles/Dockerfile'
 
 jobs:
   matrix:
