@@ -52,18 +52,13 @@ pvm pre-builds PHP for each version and architecture and stores the tarballs as 
 
 ## Installation
 
-**1. Download the binary**
+**1. Run the installer**
 
 ```bash
-curl -fsSL https://github.com/kunalGhoshOne/pvm/releases/latest/download/pvm-linux-amd64 \
-  -o /usr/local/bin/pvm && chmod +x /usr/local/bin/pvm
+curl -fsSL https://raw.githubusercontent.com/kunalGhoshOne/pvm/main/install.sh | bash
 ```
 
-For ARM64:
-```bash
-curl -fsSL https://github.com/kunalGhoshOne/pvm/releases/latest/download/pvm-linux-arm64 \
-  -o /usr/local/bin/pvm && chmod +x /usr/local/bin/pvm
-```
+The installer detects your architecture (amd64 / arm64) automatically and puts `pvm` in `/usr/local/bin`.
 
 **2. Set up shims and add to PATH**
 
