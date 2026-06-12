@@ -1,0 +1,40 @@
+name: Release CLI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build pvm binary via Docker
+        run: |
+          mkdir -p dist
+          docker buildx build \
+            --platform "linux/${{ matrix.arch }}" \
+            --build-arg TARGETARCH=${{ matrix.arch }} \
+            --output "type=local,dest=dist/out-${{ matrix.arch }}" \
+            --target export \
+            cli/
+          mv "dist/out-${{ matrix.arch }}/pvm" "dist/pvm-linux-${{ matrix.arch }}"
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            "dist/pvm-linux-${{ matrix.arch }}" --clobber

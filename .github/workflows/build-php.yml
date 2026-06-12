@@ -1,0 +1,79 @@
+name: Build PHP Versions
+
+on:
+  workflow_dispatch:
+    inputs:
+      php_minor:
+        description: 'PHP minor version to build (e.g. 8.3) or "all"'
+        required: true
+        default: 'all'
+  push:
+    paths:
+      - 'server/scripts/versions.sh'
+      - 'server/dockerfiles/Dockerfile'
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.set.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set
+        run: |
+          INPUT="${{ github.event.inputs.php_minor || 'all' }}"
+          source server/scripts/versions.sh
+          MINORS=()
+          for V in "${!PHP_VERSIONS[@]}"; do
+            if [[ "$INPUT" == "all" || "$INPUT" == "$V" ]]; then
+              MINORS+=("$V")
+            fi
+          done
+          JSON="$(printf '%s\n' "${MINORS[@]}" | sort | jq -Rsc 'split("\n")[:-1]')"
+          echo "versions=${JSON}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php_minor: ${{ fromJson(needs.matrix.outputs.versions) }}
+        arch: [amd64, arm64]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU (for arm64 cross-compilation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Resolve full PHP version
+        id: ver
+        run: |
+          source server/scripts/versions.sh
+          echo "full=${PHP_VERSIONS[${{ matrix.php_minor }}]}" >> "$GITHUB_OUTPUT"
+
+      - name: Build PHP ${{ matrix.php_minor }} (${{ matrix.arch }})
+        run: |
+          chmod +x server/scripts/build.sh
+          ./server/scripts/build.sh "${{ matrix.php_minor }}" "${{ matrix.arch }}"
+
+      - name: Create/update GitHub release and upload asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FULL="${{ steps.ver.outputs.full }}"
+          MINOR="${{ matrix.php_minor }}"
+          ARCH="${{ matrix.arch }}"
+          FILE="server/dist/php-${FULL}-linux-${ARCH}.tar.gz"
+          TAG="php-${MINOR}"
+
+          gh release create "${TAG}" \
+            --title "PHP ${MINOR}" \
+            --notes "PHP ${MINOR} — pre-built binaries for Linux" \
+            2>/dev/null || true
+
+          gh release upload "${TAG}" "${FILE}" --clobber
