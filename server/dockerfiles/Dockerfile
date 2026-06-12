@@ -3,7 +3,7 @@ ARG PHP_FULL_VERSION=8.3.21
 ARG PHP_MINOR_VERSION=8.3
 
 # ── Stage 1: build PHP from source ────────────────────────────────────────────
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:20.04 AS builder
 
 ARG PHP_FULL_VERSION
 ARG PHP_MINOR_VERSION

@@ -48,6 +48,8 @@ pvm pre-builds PHP for each version and architecture and stores the tarballs as 
 
 **Architectures:** `linux/amd64` · `linux/arm64`
 
+**Distros:** Ubuntu 20.04, 22.04, 24.04 — and any Linux with GLIBC 2.31+
+
 ---
 
 ## Installation
