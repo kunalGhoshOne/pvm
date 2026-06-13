@@ -46,7 +46,7 @@ pvm pre-builds PHP for each version and architecture and stores the tarballs as 
 | 8.1     | 8.1.32      | Security only |
 | 8.0     | 8.0.30      | End of life   |
 
-**Architectures:** `linux/amd64` · `linux/arm64`
+**Architectures:** `linux/amd64`
 
 **Distros:** Ubuntu 20.04, 22.04, 24.04 — and any Linux with GLIBC 2.31+
 
@@ -165,7 +165,7 @@ cd cli
 ## Adding a new PHP version
 
 1. Edit `server/scripts/versions.sh` and `server/versions.json` — add the new minor → full version mapping
-2. Commit and push — the GitHub Actions workflow triggers automatically and builds + uploads the new version for both architectures
+2. Commit and push, then manually trigger the **Build PHP Versions** workflow from the GitHub Actions tab
 
 ---
 

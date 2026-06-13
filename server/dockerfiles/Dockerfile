@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libargon2-dev \
     libsodium-dev \
     libgmp-dev \
+    libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -87,6 +88,14 @@ RUN mkdir -p /pvm/lib/conf.d && \
     if [ -f /pvm/etc/php-fpm.d/www.conf.default ]; then \
         cp /pvm/etc/php-fpm.d/www.conf.default /pvm/etc/php-fpm.d/www.conf; \
     fi
+
+# Bundle all non-glibc runtime shared libraries so PHP works on Ubuntu 20-24
+RUN mkdir -p /pvm/lib/pvm-libs && \
+    find /pvm/bin /pvm/sbin /pvm/lib/php/extensions -type f 2>/dev/null | \
+    xargs ldd 2>/dev/null | \
+    grep "=> /" | awk '{print $3}' | sort -u | \
+    grep -vE "/(libc|libpthread|libdl|libm|libresolv|librt|libnss|libgcc_s|ld-linux)\.so" | \
+    xargs -I{} cp -n {} /pvm/lib/pvm-libs/ 2>/dev/null; exit 0
 
 # ── Stage 2: export only the install files ────────────────────────────────────
 FROM scratch AS export

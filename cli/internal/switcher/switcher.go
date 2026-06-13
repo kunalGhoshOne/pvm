@@ -22,6 +22,7 @@ PVM_PHP="$(cat "$PVM_VERSION_FILE")"
 PVM_DIR="${HOME}/.pvm/versions/${PVM_PHP}"
 export PHPRC="${PVM_DIR}/lib"
 export PHP_INI_SCAN_DIR="${PVM_DIR}/lib/conf.d"
+export LD_LIBRARY_PATH="${PVM_DIR}/lib/pvm-libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 exec "${PVM_DIR}/%s" "$@"
 `
 
@@ -73,9 +74,6 @@ func (s *Switcher) EnsureShims() error {
 
 	for name, relPath := range phpBinaries {
 		shimPath := filepath.Join(s.cfg.ShimsDir, name)
-		if _, err := os.Stat(shimPath); err == nil {
-			continue // already exists
-		}
 		content := fmt.Sprintf(shimTemplate, relPath)
 		if err := os.WriteFile(shimPath, []byte(content), 0755); err != nil {
 			return fmt.Errorf("failed to write shim %s: %w", name, err)

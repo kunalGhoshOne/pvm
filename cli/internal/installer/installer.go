@@ -126,6 +126,29 @@ func patchPHPIni(destDir, version string) error {
 	return os.WriteFile(iniPath, []byte(patched), 0644)
 }
 
+type progressReader struct {
+	r       io.Reader
+	total   int64
+	read    int64
+	lastPct int
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	p.read += int64(n)
+	if p.total > 0 {
+		pct := int(float64(p.read) / float64(p.total) * 100)
+		if pct > p.lastPct {
+			p.lastPct = pct
+			filled := pct / 5
+			bar := strings.Repeat("█", filled) + strings.Repeat("░", 20-filled)
+			fmt.Printf("\r  [%s] %3d%%  %.1f / %.1f MB", bar, pct,
+				float64(p.read)/1e6, float64(p.total)/1e6)
+		}
+	}
+	return n, err
+}
+
 func downloadAndExtract(url, destDir string) error {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -137,7 +160,8 @@ func downloadAndExtract(url, destDir string) error {
 		return fmt.Errorf("download failed: HTTP %d — check that the version exists in releases", resp.StatusCode)
 	}
 
-	gr, err := gzip.NewReader(resp.Body)
+	pr := &progressReader{r: resp.Body, total: resp.ContentLength}
+	gr, err := gzip.NewReader(pr)
 	if err != nil {
 		return fmt.Errorf("invalid gzip: %w", err)
 	}
@@ -192,5 +216,6 @@ func downloadAndExtract(url, destDir string) error {
 			}
 		}
 	}
+	fmt.Println()
 	return nil
 }
